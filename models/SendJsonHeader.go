@@ -3,9 +3,10 @@ package models
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/context"
-	"net/http"
 )
 
 var global *context.Context

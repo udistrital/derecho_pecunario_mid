@@ -1,12 +1,13 @@
 package test
 
 import (
-	_ "github.com/udistrital/sga_derecho_pecunario_mid/routers"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	_ "github.com/udistrital/derecho_pecunario_mid/routers"
 
 	"github.com/astaxie/beego"
 	. "github.com/smartystreets/goconvey/convey"
