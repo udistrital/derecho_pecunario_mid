@@ -12,8 +12,8 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/httplib"
 	"github.com/astaxie/beego/logs"
-	"github.com/udistrital/sga_derecho_pecunario_mid/helpers"
-	"github.com/udistrital/sga_derecho_pecunario_mid/models"
+	"github.com/udistrital/derecho_pecunario_mid/helpers"
+	"github.com/udistrital/derecho_pecunario_mid/models"
 	"github.com/udistrital/utils_oas/request"
 	"github.com/udistrital/utils_oas/requestresponse"
 	"golang.org/x/sync/errgroup"
@@ -851,7 +851,7 @@ func GetSolicitudDerechoPecuniario() (interface{}, error) {
 		if Solicitudes != nil && fmt.Sprintf("%v", Solicitudes[0]) != "map[]" && Solicitudes[0]["Resultado"] != nil {
 			wge.SetLimit(-1)
 			for _, solicitud := range Solicitudes {
-				solicitud = solicitud
+
 				wge.Go(func() error {
 					referencia := solicitud["Referencia"].(string)
 					FechaCreacion := fmt.Sprintf("%v", solicitud["FechaCreacion"])
