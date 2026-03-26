@@ -14,7 +14,7 @@ func FiltrarDerechosPecuniarios(vigenciaId string) ([]interface{}, error) {
 	var parametros map[string]interface{}
 	var conceptos []interface{}
 
-	errorConceptos := request.GetJson("http://"+beego.AppConfig.String("ParametroService")+"parametro_periodo?limit=0&query=PeriodoId__Id:"+vigenciaId, &parametros)
+	errorConceptos := request.GetJson(beego.AppConfig.String("ParametroService")+"parametro_periodo?limit=0&query=PeriodoId__Id:"+vigenciaId, &parametros)
 	if errorConceptos == nil {
 		if parametros["Data"] != nil && fmt.Sprintf("%v", parametros["Data"]) != "[map[]]" {
 			conceptos = parametros["Data"].([]interface{})
