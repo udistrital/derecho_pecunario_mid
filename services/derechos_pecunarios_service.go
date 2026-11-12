@@ -853,57 +853,95 @@ func GetSolicitudDerechoPecuniario() (interface{}, error) {
 			for _, solicitud := range Solicitudes {
 
 				wge.Go(func() error {
-					referencia := solicitud["Referencia"].(string)
+					solicitudId := fmt.Sprintf("%v", solicitud["Id"])
+
+					referencia, ok := solicitud["Referencia"].(string)
+					if !ok {
+						logs.Error("GetSolicitudDerechoPecuniario: solicitud id=%s Referencia no es string o es nil", solicitudId)
+						return nil
+					}
 					FechaCreacion := fmt.Sprintf("%v", solicitud["FechaCreacion"])
 
 					var referenciaJson map[string]interface{}
-					if err := json.Unmarshal([]byte(referencia), &referenciaJson); err == nil {
-						VerSoporte := fmt.Sprintf("%v", referenciaJson["DocSoportePago"].(map[string]interface{})["Id"])
-						TerceroSolicitanteId := fmt.Sprintf("%v", referenciaJson["TerceroSolicitante"].(map[string]interface{})["Id"])
-						Nombre := fmt.Sprintf("%v", referenciaJson["TerceroSolicitante"].(map[string]interface{})["NombreCompleto"])
-						Codigo := fmt.Sprintf("%v", referenciaJson["CodigoEstudiante"])
-						DerechoPecuniarioId := referenciaJson["DerechoPecuniarioId"]
-						DerechoValor := referenciaJson["DerechoPecuniarioId"].(map[string]interface{})["Valor"].(string)
-						var valorJson map[string]interface{}
-						valor := "0"
-						if err := json.Unmarshal([]byte(DerechoValor), &valorJson); err == nil {
-							valor = fmt.Sprintf("%v", valorJson["Costo"])
-						}
-
-						var DatosIdentificacion []map[string]interface{}
-						errIdentificacion := request.GetJson(beego.AppConfig.String("TercerosService")+"datos_identificacion?limit=0&query=TerceroId.Id:"+TerceroSolicitanteId+",Activo:True", &DatosIdentificacion)
-						if errIdentificacion == nil {
-							if DatosIdentificacion != nil && fmt.Sprintf("%v", DatosIdentificacion[0]) != "map[]" {
-								NombreIdentificacion := fmt.Sprintf("%v", DatosIdentificacion[0]["TipoDocumentoId"].(map[string]interface{})["Nombre"])
-								CAIdentificacion := fmt.Sprintf("%v", DatosIdentificacion[0]["TipoDocumentoId"].(map[string]interface{})["CodigoAbreviacion"])
-								Identificacion := NombreIdentificacion + " - " + CAIdentificacion
-
-								resultadoAux := map[string]interface{}{
-									"FechaCreacion":        FechaCreacion,
-									"VerSoporte":           VerSoporte,
-									"Nombre":               Nombre,
-									"Codigo":               Codigo,
-									"DerechoPecuniarioId":  DerechoPecuniarioId,
-									"NombreIdentificacion": NombreIdentificacion,
-									"CAIdentificacion":     CAIdentificacion,
-									"Identificacion":       Identificacion,
-									"Concepto":             fmt.Sprintf("%v", DerechoPecuniarioId.(map[string]interface{})["ParametroId"].(map[string]interface{})["Nombre"]),
-									"Valor":                valor,
-									"Id":                   fmt.Sprintf("%v", solicitud["Id"]),
-									"Estado":               fmt.Sprintf("%v", solicitud["EstadoTipoSolicitudId"].(map[string]interface{})["EstadoId"].(map[string]interface{})["Nombre"]),
-								}
-								mutex.Lock()
-								resultado = append(resultado, resultadoAux)
-								mutex.Unlock()
-							} else {
-								return errors.New("Data not found")
-							}
-						} else {
-							return errIdentificacion
-						}
-					} else {
-						return err
+					if err := json.Unmarshal([]byte(referencia), &referenciaJson); err != nil {
+						logs.Error("GetSolicitudDerechoPecuniario: solicitud id=%s Referencia no es JSON valido: %v", solicitudId, err)
+						return nil
 					}
+
+					var VerSoporte string
+					if docSoporte, ok := referenciaJson["DocSoportePago"].(map[string]interface{}); ok {
+						VerSoporte = fmt.Sprintf("%v", docSoporte["Id"])
+					}
+
+					terceroSolicitante, ok := referenciaJson["TerceroSolicitante"].(map[string]interface{})
+					if !ok {
+						logs.Error("GetSolicitudDerechoPecuniario: solicitud id=%s TerceroSolicitante ausente o nil", solicitudId)
+						return nil
+					}
+					TerceroSolicitanteId := fmt.Sprintf("%v", terceroSolicitante["Id"])
+					Nombre := fmt.Sprintf("%v", terceroSolicitante["NombreCompleto"])
+					Codigo := fmt.Sprintf("%v", referenciaJson["CodigoEstudiante"])
+
+					derechoPecuniarioMap, ok := referenciaJson["DerechoPecuniarioId"].(map[string]interface{})
+					if !ok {
+						logs.Error("GetSolicitudDerechoPecuniario: solicitud id=%s DerechoPecuniarioId ausente o nil", solicitudId)
+						return nil
+					}
+					DerechoPecuniarioId := referenciaJson["DerechoPecuniarioId"]
+					DerechoValor, _ := derechoPecuniarioMap["Valor"].(string)
+					var valorJson map[string]interface{}
+					valor := "0"
+					if err := json.Unmarshal([]byte(DerechoValor), &valorJson); err == nil {
+						valor = fmt.Sprintf("%v", valorJson["Costo"])
+					}
+
+					var DatosIdentificacion []map[string]interface{}
+					errIdentificacion := request.GetJson(beego.AppConfig.String("TercerosService")+"datos_identificacion?limit=0&query=TerceroId.Id:"+TerceroSolicitanteId+",Activo:True", &DatosIdentificacion)
+					if errIdentificacion != nil {
+						logs.Error("GetSolicitudDerechoPecuniario: solicitud id=%s error consultando TercerosService: %v", solicitudId, errIdentificacion)
+						return nil
+					}
+					if DatosIdentificacion == nil || fmt.Sprintf("%v", DatosIdentificacion[0]) == "map[]" {
+						logs.Error("GetSolicitudDerechoPecuniario: solicitud id=%s DatosIdentificacion vacio", solicitudId)
+						return nil
+					}
+					tipoDoc, ok := DatosIdentificacion[0]["TipoDocumentoId"].(map[string]interface{})
+					if !ok {
+						logs.Error("GetSolicitudDerechoPecuniario: solicitud id=%s TipoDocumentoId ausente o nil", solicitudId)
+						return nil
+					}
+					NombreIdentificacion := fmt.Sprintf("%v", tipoDoc["Nombre"])
+					CAIdentificacion := fmt.Sprintf("%v", tipoDoc["CodigoAbreviacion"])
+					Identificacion := NombreIdentificacion + " - " + CAIdentificacion
+
+					var Concepto string
+					if parametroId, ok := derechoPecuniarioMap["ParametroId"].(map[string]interface{}); ok {
+						Concepto = fmt.Sprintf("%v", parametroId["Nombre"])
+					}
+					var Estado string
+					if estadoTipo, ok := solicitud["EstadoTipoSolicitudId"].(map[string]interface{}); ok {
+						if estadoId, ok := estadoTipo["EstadoId"].(map[string]interface{}); ok {
+							Estado = fmt.Sprintf("%v", estadoId["Nombre"])
+						}
+					}
+
+					resultadoAux := map[string]interface{}{
+						"FechaCreacion":        FechaCreacion,
+						"VerSoporte":           VerSoporte,
+						"Nombre":               Nombre,
+						"Codigo":               Codigo,
+						"DerechoPecuniarioId":  DerechoPecuniarioId,
+						"NombreIdentificacion": NombreIdentificacion,
+						"CAIdentificacion":     CAIdentificacion,
+						"Identificacion":       Identificacion,
+						"Concepto":             Concepto,
+						"Valor":                valor,
+						"Id":                   fmt.Sprintf("%v", solicitud["Id"]),
+						"Estado":               Estado,
+					}
+					mutex.Lock()
+					resultado = append(resultado, resultadoAux)
+					mutex.Unlock()
 					return nil
 				})
 			}
